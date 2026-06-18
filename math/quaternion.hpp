@@ -25,31 +25,48 @@ class Quaternion
 
     Quaternion operator*(const Quaternion &q) const
     {
-        return 0;
-    }
+        w_res = w * q.w - x * q.x - y * q.y - z * q.x 
+        x_res = w * q.x + x * q.w + y * q.z - z * q.y
+        y_res = w * q.y - x * q.z + y * q.w + z * q.x
+        z_res = w * q.z + x * q.y - y * q.x + z * q.w
+        return Quaternion(w_res, x_res, y_res, z_res);
+    }       
 
     conjugate() const
     {
-        return 0;
+        return Quaternion(w, -x, -y, -z);
     }
 
+
+    //TOOD see the optimized verson by using  vector expanasion formula, can break this into 15 multiplications and additions.
+    //TODO
     rotate(Vector v) const
     {
-        return 0;
+        Quaternion qv(0, v.x, v.y ,v.z);
+        Quaternion q_conj = conjugate();
+        Quaternion q_rotated = (*this) * qv * q_conj;
+        return Vector(q_rotated.x, q_rotated.y, q_rotated.z);
     }
 
+    //divide by zero?, check for it later if problem occurs  could try usign 1.0 / sqrt (faster tahn dividing several times? )
     normalize() const
     {
-        return 0;
+        double normalizaed =  std::sqrt(w*w + x*x + y*y + z*z);
+        return Quaternion(w/normalizaed, x/normalizaed, y/normalizaed, z/normalizaed);
     }
 
     toMatrix() const
     {
-        return 0;
+        return Matrix(
+            1-2*(y*y + z*z), 2*(x*y - w*z), 2*(x*z + w*y), 0,
+            2*(x*y + w*z), 1-2*(x*x + z*z), 2*(y*z - w*x), 0,
+            2*(x*z - w*y), 2*(y*z + w*x), 1-2*(x*x + y*y), 0,
+            0, 0, 0, 1
+        )
     }
 
     static Quaternion slerp(const Quaternion &q1, const Quaternion &q2, double t) const
     {
-        return 0;
+    
     }
 }
