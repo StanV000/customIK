@@ -67,6 +67,38 @@ class Quaternion
 
     static Quaternion slerp(const Quaternion &q1, const Quaternion &q2, double t) const
     {
-    
+        double dot = q1.w * q2.w + q1.x * q2.x + q1.y * q2.y + q1.z * q2.z;
+
+        if (dot < 0.0f) {
+            q2 = Quaternion(-q2.w, -q2.x, -q2.y, -q2.z);
+            dot = -dot;
+        }
+
+        const double DOT_THRESHOLD = 0.9995;
+        if (dot > DOT_THRESHOLD) {
+            Quaternion result = Quaternion(
+                q1.w + t * (q2.w - q1.w),
+                q1.x + t * (q2.x - q1.x),
+                q1.y + t * (q2.y - q1.y),
+                q1.z + t * (q2.z - q1.z)
+            );
+            return result.normalize();
+        }
+
+        double theta_0 = std::acos(dot);
+        double theta = theta_0 * t;
+
+        double sin_theta = std::sin(theta);
+        double sin_theta_0 = std::sin(theta_0);
+        double s1 = std::sin(theta_0 - theta) / sin_theta_0;
+        double s2 = sin_theta / sin_theta_0;
+
+        return Quaternion(
+            s1 * q1.w + s2 * q2.w,
+            s1 * q1.x + s2 * q2.x,
+            s1 * q1.y + s2 * q2.y,
+            s1 * q1.z + s2 * q2.z
+        );
+
     }
 }
