@@ -1,4 +1,4 @@
-
+#pragma once
 #include <cmath>
 class Vector
 {
