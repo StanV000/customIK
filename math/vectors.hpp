@@ -2,7 +2,7 @@
 #include <cmath>
 class Vector
 {
-
+public:
     // 64 bit
     double x, y, z;
 
@@ -39,8 +39,22 @@ class Vector
     }
 
     // lenght of vector is magnitude and unit vector(normalized vector) has magnitude of 1,
-    double norm() const
+    double magnitude() const
     {
         return std::sqrt(x * x + y * y + z * z);
     }
+
+    Vector normalized() const
+    {
+        double n = magnitude();
+        return Vector(x / n, y / n, z / n);
+    }
+};
+
+#include <iostream>
+
+inline std::ostream &operator<<(std::ostream &os, const Vector &v)
+{
+    os << "(" << v.x << ", " << v.y << ", " << v.z << ")";
+    return os;
 }
