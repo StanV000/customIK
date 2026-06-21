@@ -3,6 +3,8 @@
 #include "../../math/matrix.hpp"
 #include "../../math/transform.hpp"
 
+constexpr double pi = 3.14159265358979323846;
+
 enum class Axis
 {
     X,
@@ -16,9 +18,11 @@ public:
     Transform offset; // offset from parent joint
     Axis axis;        // axis of rotation
     double angle;     // current angle of rotation
+    double minAngle;  // rad
+    double maxAngle;  // rad
 
-    Joint(const Transform &offset, Axis axis, double angle = 0.0)
-        : offset(offset), axis(axis), angle(angle) {}
+    Joint(const Transform &offset, Axis axis, double angle = 0.0, double minAngle = -pi, double maxAngle = pi)
+        : offset(offset), axis(axis), angle(angle), minAngle(minAngle), maxAngle(maxAngle) {}
 
     Transform rotationTransform() const
     {
@@ -47,6 +51,16 @@ public:
 
     void setAngle(double newAngle)
     {
-        angle = newAngle;
+        angle = clamp(newAngle, minAngle, maxAngle);
     }
+
+private:
+    static double clamp(double value, double lo, double hi)
+    {
+        if (value < lo)
+            return lo;
+        if (value > hi)
+            return hi;
+        return value;
+    };
 };
