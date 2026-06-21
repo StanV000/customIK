@@ -2,6 +2,7 @@
 #include "math/vectors.hpp"
 #include "math/matrix.hpp"
 #include "math/transform.hpp"
+#include "math/jacobian.hpp"
 #include "kinematics/forward_kinematics/chain.hpp"
 
 int main()
@@ -42,6 +43,19 @@ int main()
     arm.setAngle(0, 1.5707963267948966); // pi/2
     Transform pose2 = arm.forwardKinematics();
     std::cout << "Joint1 = 90deg: EE = " << pose2.getTranslation() << std::endl;
+
+    arm.setAngle(0, 0.0);
+
+    Jacobian J = computeJacobian(arm);
+
+    std::cout << "Jacobian columns (Jv | Jw):" << std::endl;
+    for (int i = 0; i < J.numJoints(); i++)
+    {
+        std::cout << "  joint " << i
+                  << "  Jv = " << J.Jv[i]
+                  << "  Jw = " << J.Jw[i]
+                  << std::endl;
+    }
 
     return 0;
 }
