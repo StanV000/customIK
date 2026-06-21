@@ -1,5 +1,7 @@
 #pragma once
 #include <cmath>
+#include "vectors.hpp"
+
 // RX,RY,RZ are rotation matrices, they rotate a vector around the X,Y,Z axis respectively.
 // Matrix * Matrix, chain multiple rotations together
 // Matrix * Vctor, apply a rotation to a point or direction

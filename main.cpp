@@ -4,6 +4,10 @@
 #include "math/transform.hpp"
 #include "math/jacobian.hpp"
 #include "kinematics/forward_kinematics/chain.hpp"
+#include "solvers/jacobianIK.hpp"
+#include <numbers>
+
+double p = std::numbers::pi;
 
 int main()
 {
@@ -56,6 +60,25 @@ int main()
                   << "  Jw = " << J.Jw[i]
                   << std::endl;
     }
+
+    arm.setAngle(0, 0.0);
+    arm.setAngle(1, 0.0);
+    arm.setAngle(2, 0.0);
+
+    Transform target(Matrix(1, 0, 0, 0, 1, 0, 0, 0, 1), Vector(0, 2, 0));
+
+    IKResult ikResult = solveIK(arm, target);
+
+    std::cout << "IK success: " << (ikResult.success ? "yes" : "no")
+              << "  iterations: " << ikResult.iterations << std::endl;
+
+    Transform finalPose = arm.forwardKinematics();
+    std::cout << "Final EE position: " << finalPose.getTranslation() << std::endl;
+
+    std::cout << "Final joint angles (degrees): "
+              << arm.joints[0].angle * 180.0 / std::numbers::pi << ", "
+              << arm.joints[1].angle * 180.0 / std::numbers::pi << ", "
+              << arm.joints[2].angle * 180.0 / std::numbers::pi << std::endl;
 
     return 0;
 }

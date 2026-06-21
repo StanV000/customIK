@@ -1,0 +1,79 @@
+#pragma once
+#include <vector>
+#include <cmath>
+#include "../math/vectors.hpp"
+#include "../math/matrix.hpp"
+#include "../math/transform.hpp"
+#include "../kinematics/forward_kinematics/joint.hpp"
+#include "../kinematics/forward_kinematics/chain.hpp"
+#include "../math/jacobian.hpp"
+#include "../math/matrixX.hpp"
+
+struct IKResult
+{
+    bool success;
+    int iterations;
+};
+
+inline Vector orientationError(const Matrix &targetR, const Matrix &currentR)
+{
+    Matrix Rerr = targetR * currentR.transpose();
+
+    return Vector(
+        0.5 * (Rerr.grid[2][1] - Rerr.grid[1][2]),
+        0.5 * (Rerr.grid[0][2] - Rerr.grid[2][0]),
+        0.5 * (Rerr.grid[1][0] - Rerr.grid[0][1]));
+}
+
+inline std::vector<double> dampedLeastSquares(const MatrixX &J, const std::vector<double> &error, double lambda)
+{
+    MatrixX Jt = J.transpose(); // Nx6
+    MatrixX JJt = J * Jt;       // 6x6 (always square, regardless of N)
+    JJt.addDamping(lambda);
+    MatrixX JJt_inv = JJt.inverse(); // 6x6
+
+    std::vector<double> temp = JJt_inv.multiply(error); // 6x1
+    std::vector<double> dq = Jt.multiply(temp);         // Nx1
+
+    return dq;
+}
+
+inline IKResult solveIK(Chain &chain, const Transform &target,
+                        int maxIterations = 200, double tolerance = 1e-3,
+                        double lambda = 0.1, double stepSize = 0.5)
+{
+    for (int iter = 0; iter < maxIterations; iter++)
+    {
+        Transform current = chain.forwardKinematics();
+
+        Vector posError = target.getTranslation() - current.getTranslation();
+        Vector rotError = orientationError(target.getRotation(), current.getRotation());
+
+        std::vector<double> error = {
+            posError.x, posError.y, posError.z,
+            rotError.x, rotError.y, rotError.z};
+
+        double errorMag = std::sqrt(
+            posError.x * posError.x + posError.y * posError.y + posError.z * posError.z +
+            rotError.x * rotError.x + rotError.y * rotError.y + rotError.z * rotError.z);
+
+        if (iter % 10 == 0)
+            std::cout << "  iter " << iter << " error = " << errorMag << std::endl;
+
+        if (errorMag < tolerance)
+            return {true, iter};
+
+        Jacobian J = computeJacobian(chain);
+        MatrixX Jm = jacobianToMatrixX(J);
+
+        std::vector<double> dq = dampedLeastSquares(Jm, error, lambda);
+
+        for (size_t i = 0; i < chain.joints.size(); i++)
+        {
+            double newAngle = chain.joints[i].angle + dq[i] * stepSize;
+            chain.setAngle((int)i, newAngle);
+        }
+    }
+
+    return {false, maxIterations};
+}

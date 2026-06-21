@@ -5,6 +5,7 @@
 #include "transform.hpp"
 #include "../kinematics/forward_kinematics/joint.hpp"
 #include "../kinematics/forward_kinematics/chain.hpp"
+#include "matrixX.hpp"
 
 inline Vector axisToVector(Axis axis)
 {
@@ -56,4 +57,22 @@ inline Jacobian computeJacobian(const Chain &chain)
     }
 
     return J;
+}
+
+inline MatrixX jacobianToMatrixX(const Jacobian &J)
+{
+    int n = J.numJoints();
+    MatrixX m(6, n);
+
+    for (int i = 0; i < n; i++)
+    {
+        m(0, i) = J.Jv[i].x;
+        m(1, i) = J.Jv[i].y;
+        m(2, i) = J.Jv[i].z;
+        m(3, i) = J.Jw[i].x;
+        m(4, i) = J.Jw[i].y;
+        m(5, i) = J.Jw[i].z;
+    }
+
+    return m;
 }
