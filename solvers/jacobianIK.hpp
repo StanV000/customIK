@@ -38,10 +38,32 @@ inline std::vector<double> dampedLeastSquares(const MatrixX &J, const std::vecto
     return dq;
 }
 
+inline double computeMaxReach(const Chain &chain)
+{
+    double total = 0.0;
+    for (const auto &joint : chain.joints)
+    {
+        Vector offset = joint.offset.getTranslation();
+        total += offset.magnitude();
+    }
+    return total;
+}
+
 inline IKResult solveIK(Chain &chain, const Transform &target,
                         int maxIterations = 200, double tolerance = 1e-3,
                         double lambda = 0.1, double stepSize = 0.5)
 {
+    double maxReach = computeMaxReach(chain);
+    Vector baseToTarget = target.getTranslation() - chain.base.getTranslation();
+    double targetDistance = baseToTarget.magnitude();
+
+    if (targetDistance > maxReach)
+    {
+        std::cout << "IK target unreachable: distance " << targetDistance
+                  << " exceeds max reach " << maxReach << std::endl;
+        return {false, 0};
+    }
+
     for (int iter = 0; iter < maxIterations; iter++)
     {
         Transform current = chain.forwardKinematics();
