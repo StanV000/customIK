@@ -82,3 +82,21 @@ int main()
 
     return 0;
 }
+
+// a + b = (1, 1, 0)
+// Rz(90) * (1,0,0) = (6.12303e-17, 1, 0)
+// Transform applied to (1,0,0) = (2, 1, 0)
+// All angles 0: EE = (2, 0, 0)
+// Joint1 = 90deg: EE = (1.22461e-16, 2, 0)
+// Jacobian columns (Jv | Jw):
+//   joint 0  Jv = (0, 2, 0)  Jw = (0, 0, 1)
+//   joint 1  Jv = (0, 1, 0)  Jw = (0, 0, 1)
+//   joint 2  Jv = (0, 0, 0)  Jw = (0, 0, 1)
+//   iter 0 error = 2.82843
+//   iter 10 error = 0.0106922
+//   iter 20 error = 0.00261659
+//   iter 30 error = 0.00144966
+//   iter 40 error = 0.000993151
+// IK success: yes  iterations: 40
+// Final EE position: (-6.03638e-09, 1.99901, 0)
+// Final joint angles (degrees): 88.1943, 3.61132, -91.80
