@@ -49,9 +49,31 @@ inline double computeMaxReach(const Chain &chain)
     return total;
 }
 
-inline IKResult solveIK(Chain &chain, const Transform &target,
-                        int maxIterations = 200, double tolerance = 1e-3,
-                        double lambda = 0.1, double stepSize = 0.5)
+inline double computeManipulability(const MatrixX &J)
+{
+    MatrixX Jt = J.transpose();
+    MatrixX JJt = J * Jt;
+    double d = JJt.determinant();
+    if (d < 0.0)
+        d = 0.0; // numerical noise can give tiny negatives
+    return std::sqrt(d);
+}
+
+// Nakamura-Hanafusa adaptive damping:
+// returns a small lambda when well-conditioned,
+// ramps up smoothly toward lambda_max as manipulability approaches zero
+inline double adaptiveLambda(double w,
+                             double w_threshold = 0.05,
+                             double lambda_min = 0.001,
+                             double lambda_max = 0.1)
+{
+    if (w >= w_threshold)
+        return lambda_min;
+
+    double t = 1.0 - w / w_threshold;
+    return lambda_min + (lambda_max - lambda_min) * t * t;
+}
+inline IKResult solveIK(Chain &chain, const Transform &target, int maxIterations = 200, double tolerance = 1e-3, double stepSize = 0.5)
 {
     double maxReach = computeMaxReach(chain);
     Vector baseToTarget = target.getTranslation() - chain.base.getTranslation();
@@ -79,16 +101,22 @@ inline IKResult solveIK(Chain &chain, const Transform &target,
             posError.x * posError.x + posError.y * posError.y + posError.z * posError.z +
             rotError.x * rotError.x + rotError.y * rotError.y + rotError.z * rotError.z);
 
-        if (iter % 10 == 0)
-            std::cout << "  iter " << iter << " error = " << errorMag << std::endl;
-
         if (errorMag < tolerance)
             return {true, iter};
 
         Jacobian J = computeJacobian(chain);
         MatrixX Jm = jacobianToMatrixX(J);
+        double w = computeManipulability(Jm);
+        double adaptedLambda = adaptiveLambda(w);
 
-        std::vector<double> dq = dampedLeastSquares(Jm, error, lambda);
+        if (iter % 10 == 0)
+            std::cout << "  iter " << iter
+                      << " error = " << errorMag
+                      << " w = " << w
+                      << " lambda = " << adaptedLambda
+                      << std::endl;
+
+        std::vector<double> dq = dampedLeastSquares(Jm, error, adaptedLambda);
 
         for (size_t i = 0; i < chain.joints.size(); i++)
         {
@@ -96,6 +124,5 @@ inline IKResult solveIK(Chain &chain, const Transform &target,
             chain.setAngle((int)i, newAngle);
         }
     }
-
     return {false, maxIterations};
 }

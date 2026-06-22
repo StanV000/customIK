@@ -155,4 +155,60 @@ public:
 
         return result;
     }
+
+    double determinant() const
+    {
+        if (rows != cols)
+            throw std::runtime_error("MatrixX determinant: matrix must be square");
+
+        int n = rows;
+        MatrixX aug(n, n);
+        for (int i = 0; i < n; i++)
+            for (int j = 0; j < n; j++)
+                aug(i, j) = (*this)(i, j);
+
+        double det = 1.0;
+        for (int col = 0; col < n; col++)
+        {
+            // partial pivoting
+            int pivotRow = col;
+            double maxVal = std::abs(aug(col, col));
+            for (int r = col + 1; r < n; r++)
+            {
+                if (std::abs(aug(r, col)) > maxVal)
+                {
+                    maxVal = std::abs(aug(r, col));
+                    pivotRow = r;
+                }
+            }
+
+            if (maxVal < 1e-12)
+                return 0.0; // singular
+
+            // row swap flips sign of determinant
+            if (pivotRow != col)
+            {
+                for (int j = 0; j < n; j++)
+                {
+                    double tmp = aug(col, j);
+                    aug(col, j) = aug(pivotRow, j);
+                    aug(pivotRow, j) = tmp;
+                }
+                det *= -1.0;
+            }
+
+            // accumulate pivot into determinant
+            det *= aug(col, col);
+
+            // eliminate below
+            double pivot = aug(col, col);
+            for (int r = col + 1; r < n; r++)
+            {
+                double factor = aug(r, col) / pivot;
+                for (int j = col; j < n; j++)
+                    aug(r, j) -= factor * aug(col, j);
+            }
+        }
+        return det;
+    }
 };

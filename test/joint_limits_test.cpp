@@ -35,7 +35,7 @@ void runJointLimitTest()
 
     Chain limitedArm(Transform::identity(), std::vector<Joint>{j1Limited, j2b, endTipB});
 
-    Transform target2(Matrix(1, 0, 0, 0, 1, 0, 0, 0, 1), Vector(0, 2, 2));
+    Transform target2(Matrix(1, 0, 0, 0, 1, 0, 0, 0, 1), Vector(0, 1.5, 0));
     IKResult limitedResult = solveIK(limitedArm, target2);
 
     std::cout << "Limited arm IK success: " << (limitedResult.success ? "yes" : "no")
