@@ -12,17 +12,18 @@ class Quaternion
 public:
     double w, x, y, z;
 
+    Quaternion() : w(1.0), x(0.0), y(0.0), z(0.0) {}
     Quaternion(double w, double x, double y, double z) : w(w), x(x), y(y), z(z) {}
 
     static Quaternion fromAxisAngle(double angle, double axisX, double axisY, double axisZ)
     {
-
-        w = std::cos(angle / 2.0);
-        x = axisX * std::sin(angle / 2.0);
-        y = axisY * std::sin(angle / 2.0);
-        z = axisZ * std::sin(angle / 2.0);
-
-        return Quaternion(w, x, y, z);
+        double half = angle * 0.5;
+        double s = std::sin(half);
+        double w = std::cos(half);
+        double x = axisX * s;
+        double y = axisY * s;
+        double z = axisZ * s;
+        return Quaternion(w, x, y, z).normalize();
     }
 
     Quaternion operator*(const Quaternion &q) const
@@ -34,58 +35,111 @@ public:
         return Quaternion(w_res, x_res, y_res, z_res);
     }
 
-    conjugate() const
+    Quaternion conjugate() const
     {
         return Quaternion(w, -x, -y, -z);
     }
 
     // TOOD see the optimized verson by using  vector expanasion formula, can break this into 15 multiplications and additions.
     // TODO
-    Vector rotate(Vector v) const
+    Vector rotate(const Vector &v) const
     {
-        Quaternion qv(0, v.x, v.y, v.z);
+        Quaternion qv(0.0, v.x, v.y, v.z);
         Quaternion q_conj = conjugate();
         Quaternion q_rotated = (*this) * qv * q_conj;
         return Vector(q_rotated.x, q_rotated.y, q_rotated.z);
     }
 
-    // divide by zero?, check for it later if problem occurs  could try usign 1.0 / sqrt (faster tahn dividing several times? )
     Quaternion normalize() const
     {
-        double normalizaed = std::sqrt(w * w + x * x + y * y + z * z);
-        return Quaternion(w / normalizaed, x / normalizaed, y / normalizaed, z / normalizaed);
+        double norm = std::sqrt(w * w + x * x + y * y + z * z);
+        if (norm == 0.0)
+            return Quaternion(1.0, 0.0, 0.0, 0.0);
+        return Quaternion(w / norm, x / norm, y / norm, z / norm);
+    }
+
+    double dot(const Quaternion &q) const
+    {
+        return w * q.w + x * q.x + y * q.y + z * q.z;
+    }
+
+    static Quaternion fromRotationMatrix(const Matrix &m)
+    {
+        double trace = m.grid[0][0] + m.grid[1][1] + m.grid[2][2];
+        if (trace > 0.0)
+        {
+            double s = std::sqrt(trace + 1.0) * 2.0;
+            double w = 0.25 * s;
+            double x = (m.grid[2][1] - m.grid[1][2]) / s;
+            double y = (m.grid[0][2] - m.grid[2][0]) / s;
+            double z = (m.grid[1][0] - m.grid[0][1]) / s;
+            return Quaternion(w, x, y, z).normalize();
+        }
+        if (m.grid[0][0] > m.grid[1][1] && m.grid[0][0] > m.grid[2][2])
+        {
+            double s = std::sqrt(1.0 + m.grid[0][0] - m.grid[1][1] - m.grid[2][2]) * 2.0;
+            double w = (m.grid[2][1] - m.grid[1][2]) / s;
+            double x = 0.25 * s;
+            double y = (m.grid[0][1] + m.grid[1][0]) / s;
+            double z = (m.grid[0][2] + m.grid[2][0]) / s;
+            return Quaternion(w, x, y, z).normalize();
+        }
+        if (m.grid[1][1] > m.grid[2][2])
+        {
+            double s = std::sqrt(1.0 + m.grid[1][1] - m.grid[0][0] - m.grid[2][2]) * 2.0;
+            double w = (m.grid[0][2] - m.grid[2][0]) / s;
+            double x = (m.grid[0][1] + m.grid[1][0]) / s;
+            double y = 0.25 * s;
+            double z = (m.grid[1][2] + m.grid[2][1]) / s;
+            return Quaternion(w, x, y, z).normalize();
+        }
+        double s = std::sqrt(1.0 + m.grid[2][2] - m.grid[0][0] - m.grid[1][1]) * 2.0;
+        double w = (m.grid[1][0] - m.grid[0][1]) / s;
+        double x = (m.grid[0][2] + m.grid[2][0]) / s;
+        double y = (m.grid[1][2] + m.grid[2][1]) / s;
+        double z = 0.25 * s;
+        return Quaternion(w, x, y, z).normalize();
     }
 
     Matrix toMatrix() const
     {
+        double xx = x * x;
+        double yy = y * y;
+        double zz = z * z;
+        double xy = x * y;
+        double xz = x * z;
+        double yz = y * z;
+        double wx = w * x;
+        double wy = w * y;
+        double wz = w * z;
+
         return Matrix(
-            1 - 2 * (y * y + z * z), 2 * (x * y - w * z), 2 * (x * z + w * y), 0,
-            2 * (x * y + w * z), 1 - 2 * (x * x + z * z), 2 * (y * z - w * x), 0,
-            2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y), 0,
-            0, 0, 0, 1);
+            1.0 - 2.0 * (yy + zz), 2.0 * (xy - wz), 2.0 * (xz + wy),
+            2.0 * (xy + wz), 1.0 - 2.0 * (xx + zz), 2.0 * (yz - wx),
+            2.0 * (xz - wy), 2.0 * (yz + wx), 1.0 - 2.0 * (xx + yy));
     }
 
-    static Quaternion slerp(const Quaternion &q1, const Quaternion &q2, double t) const
+    static Quaternion slerp(const Quaternion &q1, const Quaternion &q2, double t)
     {
         double dot = q1.w * q2.w + q1.x * q2.x + q1.y * q2.y + q1.z * q2.z;
 
         Quaternion b = q2;
 
-        if (dot < 0.0f)
+        if (dot < 0.0)
         {
-            q2 = Quaternion(-b.w, -b.x, -b.y, -b.z);
+            b = Quaternion(-b.w, -b.x, -b.y, -b.z);
             dot = -dot;
         }
 
         const double DOT_THRESHOLD = 0.9995;
         if (dot > DOT_THRESHOLD)
         {
-            Quaternion result = Quaternion(
-                                    q1.w + t * (b.w - q1.w),
-                                    q1.x + t * (b.x - q1.x),
-                                    q1.y + t * (b.y - q1.y),
-                                    q1.z + t * (b.z - q1.z))
-                                    .normalize();
+            return Quaternion(
+                q1.w + t * (b.w - q1.w),
+                q1.x + t * (b.x - q1.x),
+                q1.y + t * (b.y - q1.y),
+                q1.z + t * (b.z - q1.z))
+                .normalize();
         }
 
         double theta_0 = std::acos(dot);
@@ -102,4 +156,4 @@ public:
             s1 * q1.y + s2 * q2.y,
             s1 * q1.z + s2 * q2.z);
     }
-}
+};

@@ -1,9 +1,11 @@
 #pragma once
+#include <iostream>
 #include <vector>
 #include <cmath>
 #include "../math/vectors.hpp"
 #include "../math/matrix.hpp"
 #include "../math/transform.hpp"
+#include "../math/quaternion.hpp"
 #include "../kinematics/forward_kinematics/joint.hpp"
 #include "../kinematics/forward_kinematics/chain.hpp"
 #include "../math/jacobian.hpp"
@@ -17,12 +19,12 @@ struct IKResult
 
 inline Vector orientationError(const Matrix &targetR, const Matrix &currentR)
 {
-    Matrix Rerr = targetR * currentR.transpose();
-
-    return Vector(
-        0.5 * (Rerr.grid[2][1] - Rerr.grid[1][2]),
-        0.5 * (Rerr.grid[0][2] - Rerr.grid[2][0]),
-        0.5 * (Rerr.grid[1][0] - Rerr.grid[0][1]));
+    Quaternion qt = Quaternion::fromRotationMatrix(targetR);
+    Quaternion qc = Quaternion::fromRotationMatrix(currentR);
+    Quaternion qerr = qt * qc.conjugate();
+    if (qerr.w < 0.0)
+        qerr = Quaternion(-qerr.w, -qerr.x, -qerr.y, -qerr.z);
+    return Vector(qerr.x, qerr.y, qerr.z) * 2.0;
 }
 
 inline std::vector<double> dampedLeastSquares(const MatrixX &J, const std::vector<double> &error, double lambda)
@@ -30,10 +32,20 @@ inline std::vector<double> dampedLeastSquares(const MatrixX &J, const std::vecto
     MatrixX Jt = J.transpose(); // Nx6
     MatrixX JJt = J * Jt;       // 6x6 (always square, regardless of N)
     JJt.addDamping(lambda);
-    MatrixX JJt_inv = JJt.inverse(); // 6x6
 
-    std::vector<double> temp = JJt_inv.multiply(error); // 6x1
-    std::vector<double> dq = Jt.multiply(temp);         // Nx1
+    std::vector<double> temp;
+    try
+    {
+        temp = JJt.solve(error); // 6x1
+    }
+    catch (const std::runtime_error &)
+    {
+        // fallback: increase damping if singular
+        JJt.addDamping(lambda * 10.0);
+        temp = JJt.solve(error);
+    }
+
+    std::vector<double> dq = Jt.multiply(temp); // Nx1
 
     return dq;
 }
@@ -79,11 +91,13 @@ inline IKResult solveIK(Chain &chain, const Transform &target, int maxIterations
     Vector baseToTarget = target.getTranslation() - chain.base.getTranslation();
     double targetDistance = baseToTarget.magnitude();
 
+    bool unreachable = false;
     if (targetDistance > maxReach)
     {
+        unreachable = true;
         std::cout << "IK target unreachable: distance " << targetDistance
-                  << " exceeds max reach " << maxReach << std::endl;
-        return {false, 0};
+                  << " exceeds max reach " << maxReach
+                  << ". Solver will still approximate closest reachable pose." << std::endl;
     }
 
     for (int iter = 0; iter < maxIterations; iter++)
@@ -93,15 +107,24 @@ inline IKResult solveIK(Chain &chain, const Transform &target, int maxIterations
         Vector posError = target.getTranslation() - current.getTranslation();
         Vector rotError = orientationError(target.getRotation(), current.getRotation());
 
-        std::vector<double> error = {
-            posError.x, posError.y, posError.z,
-            rotError.x, rotError.y, rotError.z};
+        double positionWeight = 1.0;
+        double orientationWeight = 0.5;
 
+        std::vector<double> error = {
+            posError.x * positionWeight,
+            posError.y * positionWeight,
+            posError.z * positionWeight,
+            rotError.x * orientationWeight,
+            rotError.y * orientationWeight,
+            rotError.z * orientationWeight};
+
+        double posErrorMag = posError.magnitude();
+        double rotErrorMag = rotError.magnitude();
         double errorMag = std::sqrt(
             posError.x * posError.x + posError.y * posError.y + posError.z * posError.z +
             rotError.x * rotError.x + rotError.y * rotError.y + rotError.z * rotError.z);
 
-        if (errorMag < tolerance)
+        if (posErrorMag < tolerance && rotErrorMag < tolerance * 0.5)
             return {true, iter};
 
         Jacobian J = computeJacobian(chain);
@@ -111,9 +134,10 @@ inline IKResult solveIK(Chain &chain, const Transform &target, int maxIterations
 
         if (iter % 10 == 0)
             std::cout << "  iter " << iter
-                      << " error = " << errorMag
-                      << " w = " << w
-                      << " lambda = " << adaptedLambda
+                      << " pos=" << posErrorMag
+                      << " ori=" << rotErrorMag
+                      << " w=" << w
+                      << " lambda=" << adaptedLambda
                       << std::endl;
 
         std::vector<double> dq = dampedLeastSquares(Jm, error, adaptedLambda);

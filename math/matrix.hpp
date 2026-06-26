@@ -48,6 +48,11 @@ public:
         return Matrix(c, -s, 0, s, c, 0, 0, 0, 1);
     }
 
+    static Matrix identity()
+    {
+        return Matrix(1, 0, 0, 0, 1, 0, 0, 0, 1);
+    }
+
     // you compute two rtoations into one, it gives a single matrix that does both rotations at once.
     // each element is the dot product of a row from the left matrix with a column from the right matrix.
     // you can chain joint rotations together, joint 1 has rotation R1 and joint 2 has rotation R2 relative to joint 1.

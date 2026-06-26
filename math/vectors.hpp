@@ -23,6 +23,11 @@ public:
         return Vector(x * scalar, y * scalar, z * scalar);
     }
 
+    Vector operator/(double scalar) const
+    {
+        return Vector(x / scalar, y / scalar, z / scalar);
+    }
+
     // takes two vectrs and returns a single number that is the dot product of the two vectors, (scalar)
     //  measures how much two vectors poitn in the same direction
 
@@ -47,7 +52,9 @@ public:
     Vector normalized() const
     {
         double n = magnitude();
-        return Vector(x / n, y / n, z / n);
+        if (n == 0.0)
+            return Vector(0.0, 0.0, 0.0);
+        return (*this) / n;
     }
 };
 
@@ -57,4 +64,4 @@ inline std::ostream &operator<<(std::ostream &os, const Vector &v)
 {
     os << "(" << v.x << ", " << v.y << ", " << v.z << ")";
     return os;
-}
+}           

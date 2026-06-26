@@ -6,9 +6,10 @@
 
 int main()
 {
+    runIKSolverTest();
+    runIKAccuracyTest();
     // runVectorTransformTest();
     // runForwardKinematicsTest();
-    // runIKSolverTest();
     // runJointLimitTest();
 
     std::cout << "\n6-DOF Arm Test" << std::endl;

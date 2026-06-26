@@ -1,4 +1,5 @@
 #pragma once
+#include <cmath>
 #include <vector>
 #include <stdexcept>
 
@@ -154,6 +155,68 @@ public:
                 result(i, j) = aug(i, n + j);
 
         return result;
+    }
+
+    std::vector<double> solve(const std::vector<double> &b) const
+    {
+        if (rows != cols)
+            throw std::runtime_error("MatrixX solve: matrix must be square");
+        if ((int)b.size() != rows)
+            throw std::runtime_error("MatrixX solve: RHS size mismatch");
+
+        int n = rows;
+        MatrixX aug(n, n + 1);
+        for (int i = 0; i < n; i++)
+        {
+            for (int j = 0; j < n; j++)
+                aug(i, j) = (*this)(i, j);
+            aug(i, n) = b[i];
+        }
+
+        for (int col = 0; col < n; col++)
+        {
+            int pivotRow = col;
+            double maxVal = std::abs(aug(col, col));
+            for (int r = col + 1; r < n; r++)
+            {
+                if (std::abs(aug(r, col)) > maxVal)
+                {
+                    maxVal = std::abs(aug(r, col));
+                    pivotRow = r;
+                }
+            }
+
+            if (maxVal < 1e-12)
+                throw std::runtime_error("MatrixX solve: matrix is singular");
+
+            if (pivotRow != col)
+            {
+                for (int j = col; j <= n; j++)
+                {
+                    double tmp = aug(col, j);
+                    aug(col, j) = aug(pivotRow, j);
+                    aug(pivotRow, j) = tmp;
+                }
+            }
+
+            double pivot = aug(col, col);
+            for (int j = col; j <= n; j++)
+                aug(col, j) /= pivot;
+
+            for (int r = 0; r < n; r++)
+            {
+                if (r == col)
+                    continue;
+                double factor = aug(r, col);
+                for (int j = col; j <= n; j++)
+                    aug(r, j) -= factor * aug(col, j);
+            }
+        }
+
+        std::vector<double> x(n);
+        for (int i = 0; i < n; i++)
+            x[i] = aug(i, n);
+        return x;
     }
 
     double determinant() const
