@@ -135,10 +135,10 @@ public:
         if (dot > DOT_THRESHOLD)
         {
             return Quaternion(
-                q1.w + t * (b.w - q1.w),
-                q1.x + t * (b.x - q1.x),
-                q1.y + t * (b.y - q1.y),
-                q1.z + t * (b.z - q1.z))
+                       q1.w + t * (b.w - q1.w),
+                       q1.x + t * (b.x - q1.x),
+                       q1.y + t * (b.y - q1.y),
+                       q1.z + t * (b.z - q1.z))
                 .normalize();
         }
 

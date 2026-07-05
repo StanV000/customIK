@@ -1,5 +1,6 @@
 #pragma once
 #include <iostream>
+#include <iomanip>
 #include <vector>
 #include <cmath>
 #include "../math/vectors.hpp"
@@ -85,6 +86,22 @@ inline double adaptiveLambda(double w,
     double t = 1.0 - w / w_threshold;
     return lambda_min + (lambda_max - lambda_min) * t * t;
 }
+inline void printMatrixXDebug(const MatrixX &m, const std::string &name)
+{
+    std::cout << "\n" << name << " (" << m.rows << "x" << m.cols << ")\n";
+    for (int r = 0; r < m.rows; ++r)
+    {
+        std::cout << "  [";
+        for (int c = 0; c < m.cols; ++c)
+        {
+            std::cout << std::fixed << std::setprecision(4) << std::setw(10) << m(r, c);
+            if (c + 1 < m.cols)
+                std::cout << " ";
+        }
+        std::cout << "]\n";
+    }
+}
+
 inline IKResult solveIK(Chain &chain, const Transform &target, int maxIterations = 200, double tolerance = 1e-3, double stepSize = 0.5)
 {
     double maxReach = computeMaxReach(chain);
@@ -132,12 +149,18 @@ inline IKResult solveIK(Chain &chain, const Transform &target, int maxIterations
         double w = computeManipulability(Jm);
         double adaptedLambda = adaptiveLambda(w);
 
-        if (iter % 10 == 0)
-            std::cout << "  iter " << iter
-                      << " pos=" << posErrorMag
-                      << " ori=" << rotErrorMag
-                      << " w=" << w
-                      << " lambda=" << adaptedLambda
+        if (iter == 0)
+        {
+            std::cout << "\n[IK] Starting solve" << std::endl;
+            printMatrixXDebug(Jm, "Jacobian");
+        }
+
+        if (iter % 10 == 0 || iter + 1 == maxIterations)
+            std::cout << "[IK] iter " << std::setw(3) << iter
+                      << " | posErr=" << std::fixed << std::setprecision(4) << std::setw(9) << posErrorMag
+                      << " | rotErr=" << std::setw(9) << rotErrorMag
+                      << " | manipulability=" << std::setw(9) << w
+                      << " | lambda=" << std::setw(9) << adaptedLambda
                       << std::endl;
 
         std::vector<double> dq = dampedLeastSquares(Jm, error, adaptedLambda);
