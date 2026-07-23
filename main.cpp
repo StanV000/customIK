@@ -56,7 +56,7 @@ void printJacobianStep(const std::string &label, const Vector &z_i, const Vector
 
 int main()
 {
-    printSection("Learning walkthrough: forward kinematics + Jacobian");
+    printSection("Forward kinematics + Jacobian");
     std::cout << "Formula 1: T_local = T_offset * R(axis, theta)\n";
     std::cout << "Formula 2: T_ee = T_base * T_1 * T_2 * ... * T_n\n\n";
 
@@ -78,8 +78,6 @@ int main()
     printTransform("T1 = T0 * joint1.localTransform()", T1);
     printTransform("T2 = T1 * joint2.localTransform()", T2);
     printTransform("T_fk = arm.forwardKinematics()", T_fk);
-
-    std::cout << "\nNotice the repeated chain rule: each joint contributes another transform.\n";
 
     std::vector<Transform> transforms;
     Transform accum = arm.base;
