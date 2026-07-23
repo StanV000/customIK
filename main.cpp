@@ -1,10 +1,16 @@
 #include <iostream>
 #include <iomanip>
 #include <string>
-#include "test/vector_transform_test.cpp"
-#include "test/forward_kinematics_test.cpp"
-#include "test/ik_solver_test.cpp"
-#include "test/joint_limits_test.cpp"
+#include <vector>
+
+#include "math/vectors.hpp"
+#include "math/matrix.hpp"
+#include "math/transform.hpp"
+#include "math/jacobian.hpp"
+#include "math/matrixX.hpp"
+#include "kinematics/forward_kinematics/joint.hpp"
+#include "kinematics/forward_kinematics/chain.hpp"
+#include "solvers/jacobianIK.hpp"
 
 namespace {
 
@@ -18,43 +24,84 @@ void printSection(const std::string &title)
 void printVector(const std::string &label, const Vector &v)
 {
     std::cout << std::fixed << std::setprecision(4)
-              << std::left << std::setw(16) << label << ": ("
+              << std::left << std::setw(18) << label << ": ("
               << std::setw(8) << v.x << ", "
               << std::setw(8) << v.y << ", "
               << std::setw(8) << v.z << ")\n";
 }
 
-void printPoseSummary(const std::string &label, const Transform &pose)
+void printTransform(const std::string &label, const Transform &t)
 {
-    printSection(label);
-    printVector("Translation", pose.getTranslation());
-    std::cout << std::left << std::setw(16) << "Rotation" << ": matrix form\n";
-    const Matrix &R = pose.getRotation();
+    std::cout << "\n" << label << "\n";
+    printVector("Translation", t.getTranslation());
+    const Matrix &R = t.getRotation();
     std::cout << std::fixed << std::setprecision(4)
               << "  [ " << std::setw(8) << R.grid[0][0] << "  " << std::setw(8) << R.grid[0][1] << "  " << std::setw(8) << R.grid[0][2] << " ]\n"
               << "  [ " << std::setw(8) << R.grid[1][0] << "  " << std::setw(8) << R.grid[1][1] << "  " << std::setw(8) << R.grid[1][2] << " ]\n"
               << "  [ " << std::setw(8) << R.grid[2][0] << "  " << std::setw(8) << R.grid[2][1] << "  " << std::setw(8) << R.grid[2][2] << " ]\n";
 }
 
-void printJointAngles(const Chain &chain)
+void printJacobianStep(const std::string &label, const Vector &z_i, const Vector &p_i, const Vector &p_e)
 {
-    std::cout << std::left << std::setw(14) << "Joint angles" << ": ";
-    for (size_t i = 0; i < chain.joints.size(); ++i)
-    {
-        std::cout << std::fixed << std::setprecision(3)
-                  << "J" << i << "=" << chain.joints[i].angle << "rad";
-        if (i + 1 < chain.joints.size())
-            std::cout << ", ";
-    }
-    std::cout << "\n";
+    Vector jv = z_i.cross(p_e - p_i);
+    std::cout << label << "\n";
+    printVector("  z_i", z_i);
+    printVector("  p_i", p_i);
+    printVector("  p_e", p_e);
+    printVector("  Jv_i = z_i x (p_e - p_i)", jv);
+    printVector("  Jw_i = z_i", z_i);
 }
 
-void printJacobian(const Chain &chain)
-{
-    Jacobian J = computeJacobian(chain);
-    MatrixX Jm = jacobianToMatrixX(J);
+} // namespace
 
-    std::cout << "\nJacobian (6x" << Jm.cols << ")\n";
+int main()
+{
+    printSection("Learning walkthrough: forward kinematics + Jacobian");
+    std::cout << "Formula 1: T_local = T_offset * R(axis, theta)\n";
+    std::cout << "Formula 2: T_ee = T_base * T_1 * T_2 * ... * T_n\n\n";
+
+    Joint j1(Transform(Matrix::identity(), Vector(1.0, 0.0, 0.0)), Axis::Z, 0.0);
+    Joint j2(Transform(Matrix::identity(), Vector(1.0, 0.0, 0.0)), Axis::Z, 0.0);
+    Chain arm(Transform::identity(), std::vector<Joint>{j1, j2});
+
+    const double theta1 = 0.5 * pi;
+    const double theta2 = -0.5 * pi;
+    arm.setAngle(0, theta1);
+    arm.setAngle(1, theta2);
+
+    Transform T0 = arm.base;
+    Transform T1 = T0 * arm.joints[0].localTransform();
+    Transform T2 = T1 * arm.joints[1].localTransform();
+    Transform T_fk = arm.forwardKinematics();
+
+    printTransform("T0 = base", T0);
+    printTransform("T1 = T0 * joint1.localTransform()", T1);
+    printTransform("T2 = T1 * joint2.localTransform()", T2);
+    printTransform("T_fk = arm.forwardKinematics()", T_fk);
+
+    std::cout << "\nNotice the repeated chain rule: each joint contributes another transform.\n";
+
+    std::vector<Transform> transforms;
+    Transform accum = arm.base;
+    for (const auto &joint : arm.joints)
+    {
+        accum = accum * joint.localTransform();
+        transforms.push_back(accum);
+    }
+
+    std::cout << "\nJacobian formula: Jv_i = z_i x (p_e - p_i), Jw_i = z_i\n";
+    Vector p_e = transforms.back().getTranslation();
+    for (size_t i = 0; i < arm.joints.size(); ++i)
+    {
+        Vector p_i = transforms[i].getTranslation();
+        Vector localAxis = Vector(0.0, 0.0, 1.0);
+        Vector z_i = transforms[i].getRotation() * localAxis;
+        printJacobianStep("\nJoint " + std::to_string(i) + " contribution", z_i, p_i, p_e);
+    }
+
+    Jacobian J = computeJacobian(arm);
+    MatrixX Jm = jacobianToMatrixX(J);
+    std::cout << "\nJacobian matrix (6 x " << Jm.cols << ") after jacobianToMatrixX():\n";
     for (int r = 0; r < Jm.rows; ++r)
     {
         std::cout << "  [";
@@ -66,104 +113,13 @@ void printJacobian(const Chain &chain)
         }
         std::cout << "]\n";
     }
-}
 
-void printIKSummary(const std::string &label, const IKResult &result)
-{
-    std::cout << std::left << std::setw(18) << label << ": "
-              << (result.success ? "success" : "failed")
+    printSection("IK solve on the same arm");
+    Transform target(Matrix::identity(), Vector(1.2, 0.6, 0.0));
+    printVector("Target position", target.getTranslation());
+    IKResult result = solveIK(arm, target, 200, 1e-4, 0.5);
+    std::cout << "IK success: " << (result.success ? "yes" : "no")
               << " | iterations=" << result.iterations << "\n";
-}
-
-} // namespace
-
-int main()
-{
-    runIKSolverTest();
-    runIKAccuracyTest();
-    // runVectorTransformTest();
-    // runForwardKinematicsTest();
-    // runJointLimitTest();
-
-    printSection("6-DOF Arm Demonstration");
-
-    Joint dof1(Transform::identity(), Axis::Z, 0.0);
-    Joint dof2(Transform(Matrix(1, 0, 0, 0, 1, 0, 0, 0, 1), Vector(0, 0, 0.4)), Axis::Y, 0.0);
-    Joint dof3(Transform(Matrix(1, 0, 0, 0, 1, 0, 0, 0, 1), Vector(0, 0, 0.5)), Axis::Y, 0.0);
-    Joint dof4(Transform(Matrix(1, 0, 0, 0, 1, 0, 0, 0, 1), Vector(0, 0, 0.4)), Axis::Y, 0.0);
-    Joint dof5(Transform(Matrix(1, 0, 0, 0, 1, 0, 0, 0, 1), Vector(0, 0, 0.35)), Axis::Z, 0.0);
-    Joint dof6(Transform(Matrix(1, 0, 0, 0, 1, 0, 0, 0, 1), Vector(0, 0, 0.25)), Axis::Y, 0.0);
-    Joint dofTip(Transform(Matrix(1, 0, 0, 0, 1, 0, 0, 0, 1), Vector(0, 0, 0.15)), Axis::Z, 0.0);
-
-    Chain arm6dof(Transform::identity(),
-                  std::vector<Joint>{dof1, dof2, dof3, dof4, dof5, dof6, dofTip});
-
-    Transform fk6_1 = arm6dof.forwardKinematics();
-    printPoseSummary("Initial pose (all angles = 0)", fk6_1);
-    printJointAngles(arm6dof);
-    printJacobian(arm6dof);
-
-    arm6dof.setAngle(0, 1.5707963267948966);
-    Transform fk6_2 = arm6dof.forwardKinematics();
-    printPoseSummary("Pose after rotating joint 1 by 90 degrees", fk6_2);
-    printJointAngles(arm6dof);
-
-    arm6dof.setAngle(0, 0.5);  // base ~30 deg, toward positive X/Y
-    arm6dof.setAngle(1, 0.4);  // shoulder bend forward
-    arm6dof.setAngle(2, -0.4); // elbow bend
-    arm6dof.setAngle(3, 0.0);
-    arm6dof.setAngle(4, 0.0);
-    arm6dof.setAngle(5, 0.0);
-    arm6dof.setAngle(6, 0.0);
-
-    Transform target6d_1(Matrix(1, 0, 0, 0, 1, 0, 0, 0, 1), Vector(0.8, 0.5, 0.8));
-    printSection("IK Solve #1");
-    printVector("Target position", target6d_1.getTranslation());
-    std::cout << "Starting joint state:\n";
-    printJointAngles(arm6dof);
-    printJacobian(arm6dof);
-    IKResult res6d_1 = solveIK(arm6dof, target6d_1);
-    printIKSummary("Result", res6d_1);
-    printPoseSummary("Final end-effector pose", arm6dof.forwardKinematics());
-    printJointAngles(arm6dof);
-
-    arm6dof.setAngle(0, 2.2);  // base pointing toward (-0.5, 0.7) region
-    arm6dof.setAngle(1, 0.4);  // shoulder bend
-    arm6dof.setAngle(2, -0.4); // elbow bend
-    arm6dof.setAngle(3, 0.0);
-    arm6dof.setAngle(4, 0.0);
-    arm6dof.setAngle(5, 0.0);
-    arm6dof.setAngle(6, 0.0);
-
-    Transform target6d_2(Matrix(1, 0, 0, 0, 1, 0, 0, 0, 1), Vector(-0.5, 0.7, 0.6));
-    printSection("IK Solve #2");
-    printVector("Target position", target6d_2.getTranslation());
-    std::cout << "Starting joint state:\n";
-    printJointAngles(arm6dof);
-    printJacobian(arm6dof);
-    IKResult res6d_2 = solveIK(arm6dof, target6d_2);
-    printIKSummary("Result", res6d_2);
-    printPoseSummary("Final end-effector pose", arm6dof.forwardKinematics());
-    printJointAngles(arm6dof);
-
-    arm6dof.setAngle(0, -1.2); // base pointing toward (0.3, -0.8) region
-    arm6dof.setAngle(1, 0.4);  // shoulder bend
-    arm6dof.setAngle(2, -0.4); // elbow bend
-    arm6dof.setAngle(3, 0.0);
-    arm6dof.setAngle(4, 0.0);
-    arm6dof.setAngle(5, 0.0);
-    arm6dof.setAngle(6, 0.0);
-
-    Transform target6d_3(Matrix(1, 0, 0, 0, 1, 0, 0, 0, 1), Vector(0.3, -0.8, 1.2));
-    printSection("IK Solve #3");
-    printVector("Target position", target6d_3.getTranslation());
-    std::cout << "Starting joint state:\n";
-    printJointAngles(arm6dof);
-    printJacobian(arm6dof);
-    IKResult res6d_3 = solveIK(arm6dof, target6d_3);
-    printIKSummary("Result", res6d_3);
-    printPoseSummary("Final end-effector pose", arm6dof.forwardKinematics());
-    printJointAngles(arm6dof);
 
     return 0;
 }
