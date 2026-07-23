@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>px150_moveit_config</name>
+  <version>0.0.0</version>
+  <description>MoveIt configuration package for the PX150 robot.</description>
+  <maintainer email="you@example.com">Your Name</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>moveit_ros_planning_interface</depend>
+  <depend>moveit_core</depend>
+  <depend>robot_state_publisher</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

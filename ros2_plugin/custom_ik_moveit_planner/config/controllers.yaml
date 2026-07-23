@@ -1,0 +1,12 @@
+controller_names:
+  - px150_arm_controller
+
+px150_arm_controller:
+  type: FollowJointTrajectory
+  joints:
+    - joint1
+    - joint2
+    - joint3
+    - joint4
+    - joint5
+    - joint6
