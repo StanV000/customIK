@@ -1,0 +1,26 @@
+joint_limits:
+  waist:
+    has_velocity_limits: true
+    max_velocity: 3.14159
+    has_acceleration_limits: false
+    max_acceleration: 0.0
+  shoulder:
+    has_velocity_limits: true
+    max_velocity: 3.14159
+    has_acceleration_limits: false
+    max_acceleration: 0.0
+  elbow:
+    has_velocity_limits: true
+    max_velocity: 3.14159
+    has_acceleration_limits: false
+    max_acceleration: 0.0
+  wrist_angle:
+    has_velocity_limits: true
+    max_velocity: 3.14159
+    has_acceleration_limits: false
+    max_acceleration: 0.0
+  wrist_rotate:
+    has_velocity_limits: true
+    max_velocity: 3.14159
+    has_acceleration_limits: false
+    max_acceleration: 0.0
